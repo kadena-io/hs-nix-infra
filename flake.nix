@@ -40,5 +40,29 @@
   };
   outputs = inputs@{...}: {
     inherit (inputs) nixpkgs haskellNix;
+    lib = rec {
+      recursiveDeps = inputs: let
+          go = currentPath: currentInputs: let
+            toInputPath = name: builtins.concatStringsSep "/" (currentPath ++ [name]);
+            directDepNames = builtins.attrNames currentInputs;
+            directOutPaths = map (name: {
+                name = name;
+                inputPath = currentPath ++ [name];
+                outPath = currentInputs.${name}.outPath;
+              }) directDepNames;
+            recurseOnName = name: go (currentPath ++ [name]) (currentInputs.${name}.inputs or {});
+            transitiveOutPaths = builtins.concatLists (map recurseOnName directDepNames);
+          in directOutPaths ++ transitiveOutPaths;
+        in go [] inputs;
+      recursiveRawFlakeBuilder = pkgs: flake: name: cmd: pkgs.runCommand name {
+          requiredSystemFeatures = [ "recursive-nix" ];
+          FLAKEDEPS = pkgs.lib.concatMapStringsSep " " (dep: dep.outPath) (recursiveDeps flake.inputs);
+          buildInputs = [ pkgs.nix ];
+          NIX_CONFIG = ''
+            experimental-features = nix-command flakes recursive-nix
+            substituters =
+          '';
+        } cmd;
+    };
   };
 }
