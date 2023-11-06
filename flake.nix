@@ -29,6 +29,8 @@
         old-ghc-nix.follows = "empty";
         iserv-proxy.follows = "empty";
         hydra.follows = "empty";
+        ghc980.follows = "empty";
+        ghc99.follows = "empty";
       };
     };
     empty = {
