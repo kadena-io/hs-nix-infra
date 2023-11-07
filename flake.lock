@@ -18,11 +18,11 @@
     },
     "flake-compat": {
       "locked": {
-        "lastModified": 1699390179,
-        "narHash": "sha256-tWx/Y8O0xq8T/YNZUichaKVO2jOZSOSoiFLQLZHi9BI=",
+        "lastModified": 1699390864,
+        "narHash": "sha256-MWSuUZWZRYI8CAKbU/NhjNy22FSOuUZ9SsdwSW5N07o=",
         "owner": "enobayram",
         "repo": "flake-compat",
-        "rev": "3a9e1d04df57bd541b561799531431b2a2ba67e3",
+        "rev": "0b84b577d4a337421ff7b014b99cbf464d211fb3",
         "type": "github"
       },
       "original": {
