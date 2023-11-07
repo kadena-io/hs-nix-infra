@@ -55,19 +55,19 @@
             transitiveOutPaths = builtins.concatLists (map recurseOnName directDepNames);
           in directOutPaths ++ transitiveOutPaths;
         in go [] inputs;
-      recursiveRawFlakeBuilder = pkgs: flake: name: cmd: pkgs.runCommand name {
-          requiredSystemFeatures = [ "recursive-nix" ];
+      recursiveRawFlakeBuilder = pkgs: flake: name: env: cmd: pkgs.runCommand name (env // {
+          requiredSystemFeatures = [ "recursive-nix" ] ++ env.requiredSystemFeatures or [];
           FLAKEDEPS = let
             # This function doesn't support building a flake with overridden inputs.
             rawFlakeInputs = (import inputs.flake-compat { src = "${flake}"; }).defaultNix.inputs;
             deps = recursiveDeps flake.inputs;
             in pkgs.lib.concatMapStringsSep " " (dep: dep.outPath) deps;
-          buildInputs = [ pkgs.nix ];
+          buildInputs = [ pkgs.nix ] ++ env.buildInputs or [];
           NIX_CONFIG = ''
             experimental-features = nix-command flakes recursive-nix
             substituters =
-          '';
-        } cmd;
+          '' + env.NIX_CONFIG or "";
+        }) cmd;
     };
   };
 }
