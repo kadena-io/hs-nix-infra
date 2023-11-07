@@ -5,6 +5,7 @@
       url = "github:input-output-hk/hackage.nix";
       flake = false;
     };
+    flake-compat.follows = "haskellNix/flake-compat";
     haskellNix = {
       url = "github:input-output-hk/haskell.nix";
       inputs = {
@@ -56,7 +57,11 @@
         in go [] inputs;
       recursiveRawFlakeBuilder = pkgs: flake: name: cmd: pkgs.runCommand name {
           requiredSystemFeatures = [ "recursive-nix" ];
-          FLAKEDEPS = pkgs.lib.concatMapStringsSep " " (dep: dep.outPath) (recursiveDeps flake.inputs);
+          FLAKEDEPS = let
+            # This function doesn't support building a flake with overridden inputs.
+            rawFlakeInputs = (import inputs.flake-compat { src = "${flake}"; }).defaultNix.inputs;
+            deps = recursiveDeps flake.inputs;
+            in pkgs.lib.concatMapStringsSep " " (dep: dep.outPath) deps;
           buildInputs = [ pkgs.nix ];
           NIX_CONFIG = ''
             experimental-features = nix-command flakes recursive-nix
