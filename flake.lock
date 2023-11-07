@@ -17,6 +17,21 @@
       }
     },
     "flake-compat": {
+      "locked": {
+        "lastModified": 1699384378,
+        "narHash": "sha256-jI0nYllONVrNnyOYrvQMIEJQJuNeKnfJo5keRxWMcWs=",
+        "owner": "enobayram",
+        "repo": "flake-compat",
+        "rev": "6ef9397736efb0f6075188aa3488022d1b85c11d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "enobayram",
+        "repo": "flake-compat",
+        "type": "github"
+      }
+    },
+    "flake-compat_2": {
       "flake": false,
       "locked": {
         "lastModified": 1672831974,
@@ -66,7 +81,7 @@
         "cardano-shell": [
           "empty"
         ],
-        "flake-compat": "flake-compat",
+        "flake-compat": "flake-compat_2",
         "ghc-8.6.5-iohk": [
           "empty"
         ],
@@ -194,6 +209,7 @@
     "root": {
       "inputs": {
         "empty": "empty",
+        "flake-compat": "flake-compat",
         "hackage": "hackage",
         "haskellNix": "haskellNix",
         "nixpkgs": "nixpkgs"

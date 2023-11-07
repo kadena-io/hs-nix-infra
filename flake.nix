@@ -5,7 +5,7 @@
       url = "github:input-output-hk/hackage.nix";
       flake = false;
     };
-    flake-compat.follows = "haskellNix/flake-compat";
+    flake-compat.url = "github:enobayram/flake-compat";
     haskellNix = {
       url = "github:input-output-hk/haskell.nix";
       inputs = {
@@ -59,7 +59,7 @@
           requiredSystemFeatures = [ "recursive-nix" ] ++ env.requiredSystemFeatures or [];
           FLAKEDEPS = let
             # This function doesn't support building a flake with overridden inputs.
-            rawFlakeInputs = (import inputs.flake-compat { src = "${flake}"; }).defaultNix.inputs;
+            rawFlakeInputs = (import inputs.flake-compat { src = "${flake}"; fetchTarball = pkgs.fetchzip; }).defaultNix.inputs;
             deps = recursiveDeps rawFlakeInputs;
             depName = dep: "DEP-${builtins.concatStringsSep "/" dep.inputPath}";
             env = builtins.listToAttrs
