@@ -60,9 +60,11 @@
           FLAKEDEPS = let
             # This function doesn't support building a flake with overridden inputs.
             rawFlakeInputs = (import inputs.flake-compat { src = "${flake}"; }).defaultNix.inputs;
-            deps = recursiveDeps flake.inputs;
-            in pkgs.writeText "${name}-flake-deps"
-                 (pkgs.lib.concatMapStringsSep " " (dep: dep.outPath) deps);
+            deps = recursiveDeps rawFlakeInputs;
+            depName = dep: "DEP-${builtins.concatStringsSep "/" dep.inputPath}";
+            env = builtins.listToAttrs
+              (map (dep: { name = depName dep; value = dep.outPath;}) deps);
+            in pkgs.runCommand "${name}-flake-deps" env "printenv > $out";
           buildInputs = [ pkgs.nix ] ++ env.buildInputs or [];
           NIX_CONFIG = ''
             experimental-features = nix-command flakes recursive-nix
