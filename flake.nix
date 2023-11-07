@@ -67,7 +67,10 @@
             experimental-features = nix-command flakes recursive-nix
             substituters =
           '' + env.NIX_CONFIG or "";
-        }) cmd;
+        }) ''
+          export HOME=$PWD
+          ${cmd}
+        '';
     };
   };
 }
