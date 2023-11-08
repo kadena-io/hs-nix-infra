@@ -6,6 +6,7 @@
       flake = false;
     };
     flake-compat.url = "github:enobayram/flake-compat";
+    nixpkgs-rec.url = "github:NixOS/nixpkgs?rev=4d2b37a84fad1091b9de401eb450aae66f1a741e";
     haskellNix = {
       url = "github:input-output-hk/haskell.nix";
       inputs = {
@@ -42,38 +43,25 @@
   outputs = inputs@{...}: {
     inherit (inputs) nixpkgs haskellNix;
     lib = rec {
-      recursiveDeps = inputs: let
-          go = currentPath: currentInputs: let
-            toInputPath = name: builtins.concatStringsSep "/" (currentPath ++ [name]);
-            directDepNames = builtins.attrNames currentInputs;
-            directOutPaths = map (name: {
-                name = name;
-                inputPath = currentPath ++ [name];
-                outPath = currentInputs.${name}.outPath;
-              }) directDepNames;
-            recurseOnName = name: go (currentPath ++ [name]) (currentInputs.${name}.inputs or {});
-            transitiveOutPaths = builtins.concatLists (map recurseOnName directDepNames);
-          in directOutPaths ++ transitiveOutPaths;
-        in go [] inputs;
-      recursiveRawFlakeBuilder = pkgs: flake: name: env: cmd: pkgs.runCommand name (env // {
-          requiredSystemFeatures = [ "recursive-nix" ] ++ env.requiredSystemFeatures or [];
-          FLAKEDEPS = let
-            # This function doesn't support building a flake with overridden inputs.
-            rawFlakeInputs = (import inputs.flake-compat { src = "${flake}"; fetchTarball = pkgs.fetchzip; }).defaultNix.inputs;
-            deps = recursiveDeps rawFlakeInputs;
-            depName = dep: "DEP-${builtins.concatStringsSep "/" dep.inputPath}";
-            env = builtins.listToAttrs
-              (map (dep: { name = depName dep; value = dep.outPath;}) deps);
-            in pkgs.runCommand "${name}-flake-deps" env "printenv > $out";
-          buildInputs = [ pkgs.nix ] ++ env.buildInputs or [];
-          NIX_CONFIG = ''
-            experimental-features = nix-command flakes recursive-nix
-            substituters =
-          '' + env.NIX_CONFIG or "";
-        }) ''
-          export HOME=$PWD
-          ${cmd}
+      runRecursiveBuild = system: name: env: cmd: let
+        pkgs = inputs.nixpkgs-rec.legacyPackages.${system};
+        buildInRec-nix = pkgs.writeText "buildInRec.nix" ''
+          {flake}: let
+            src = "''${flake}";
+            fetchTarball = (import ${inputs.nixpkgs-rec} {}).fetchzip;
+            defaultNix = (import ${inputs.flake-compat} { inherit src fetchTarball; }).defaultNix;
+            in defaultNix
         '';
+        buildInRec = pkgs.writeShellScriptBin "nix-build-flake" ''
+          nix-build ${buildInRec-nix} --arg flake "$1" -A "$2" "''${@:3}"
+        '';
+        in
+          pkgs.runCommand name
+            (env // {
+              requiredSystemFeatures = [ "recursive-nix" ] ++ env.requiredSystemFeatures or [];
+              NIX_PATH = "nixpkgs=${inputs.nixpkgs-rec}";
+              buildInputs = [ buildInRec pkgs.nix ] ++ env.buildInputs or [];
+            }) cmd;
     };
   };
 }

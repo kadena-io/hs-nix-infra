@@ -18,11 +18,11 @@
     },
     "flake-compat": {
       "locked": {
-        "lastModified": 1699390864,
-        "narHash": "sha256-MWSuUZWZRYI8CAKbU/NhjNy22FSOuUZ9SsdwSW5N07o=",
+        "lastModified": 1699384378,
+        "narHash": "sha256-jI0nYllONVrNnyOYrvQMIEJQJuNeKnfJo5keRxWMcWs=",
         "owner": "enobayram",
         "repo": "flake-compat",
-        "rev": "0b84b577d4a337421ff7b014b99cbf464d211fb3",
+        "rev": "6ef9397736efb0f6075188aa3488022d1b85c11d",
         "type": "github"
       },
       "original": {
@@ -190,6 +190,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-rec": {
+      "locked": {
+        "lastModified": 1669833724,
+        "narHash": "sha256-/HEZNyGbnQecrgJnfE8d0WC5c1xuPSD2LUpB6YXlg4c=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "4d2b37a84fad1091b9de401eb450aae66f1a741e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "4d2b37a84fad1091b9de401eb450aae66f1a741e",
+        "type": "github"
+      }
+    },
     "nixpkgs-unstable": {
       "locked": {
         "lastModified": 1695318763,
@@ -212,7 +228,8 @@
         "flake-compat": "flake-compat",
         "hackage": "hackage",
         "haskellNix": "haskellNix",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "nixpkgs-rec": "nixpkgs-rec"
       }
     }
   },
