@@ -5,7 +5,9 @@
       url = "github:input-output-hk/hackage.nix";
       flake = false;
     };
-    flake-compat.url = "github:enobayram/flake-compat";
+    # This version of flake-compat allows us to replace fetchTarball with fetchzip
+    # We can revert to upstream once https://github.com/edolstra/flake-compat/pull/62 is in
+    flake-compat.url = "github:kadena-io/flake-compat";
     nixpkgs-rec.url = "github:NixOS/nixpkgs?rev=4d2b37a84fad1091b9de401eb450aae66f1a741e";
     haskellNix = {
       url = "github:input-output-hk/haskell.nix";
