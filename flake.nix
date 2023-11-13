@@ -90,13 +90,61 @@
       # be built as a raw Nix expression inside a recursive-nix derivation. For example
       #
       #  ln -s $(nix-build ${wrapFlake self} -A default) $out
-      wrapFlake = flake: pkgs.writeText "wrapped-flake.nix" ''
-        let
+      wrapFlakeNix = flake: pkgs.writeText "wrapped-flake.nix" (wrapFlake flake);
+
+      # This is a utility for wrapping a flake into a Nix expression that can
+      # be built inside a recursive-nix derivation. This utility is meant to be used
+      # by wrapRecursiveWithMeta
+      wrapFlake = flake: ''
+        (let
           src = "${flake}";
           fetchTarball = (import ${inputs.nixpkgs-rec} {}).fetchzip;
           defaultNix = (import ${inputs.flake-compat} { inherit src fetchTarball; }).defaultNix;
-        in defaultNix
+        in defaultNix)
       '';
+
+      # This is a utility for wrapping a Nix derivation as a new derivation in such a way
+      # that the evaluation of the derivation happens inside a recursive-nix environment.
+      # It also passes the derivation's "version" and "cachedMeta" attributes through the
+      # recursive-nix layer by materializing them at the output of a "meta" derivation.
+      #
+      # Note that the `exp` input is meant to be a string containing a Nix expression
+      # that evaluates to a derivation *within a recursive-nix context*. That means either
+      # the build is unsandboxed OR care is taken to make sure that the expression doesn't
+      # try to access the local filesystem or the internet and all of its dependencies are
+      # exposed to it in the nix store. Here are examples using the `wrapFlake` utility:
+      #
+      #     wrapRecursiveWithMeta "deriv-name" (wrapFlake someFlakeInMyLocalScope)
+      #     wrapRecursiveWithMeta "deriv-name" "${wrapFlake someFlake}.mkDerivation someArg"
+      #
+      wrapRecursiveWithMeta = name: exp:
+        let recursiveMeta = runRecursiveBuild "${name}-meta"
+              {
+                NIX_CONFIG = "experimental-features = nix-command flakes";
+              }
+              ''
+                export HOME=$PWD
+                cat - > default.nix <<'EOF'
+                  let pkgs = (import ${inputs.nixpkgs-rec} {});
+                      drv = ${exp};
+                      version = drv.version or drv.meta.version or null;
+                      cachedMeta = drv.cachedMeta or null;
+                      inherit (pkgs.lib) optionalAttrs;
+                  in builtins.toJSON (
+                      optionalAttrs (version != null) { inherit version; } //
+                      optionalAttrs (cachedMeta != null) { inherit cachedMeta; }
+                  )
+                EOF
+                nix eval --raw -f default.nix > $out
+              '';
+            meta = builtins.fromJSON (builtins.readFile "${recursiveMeta}");
+            recursiveDeriv = runRecursiveBuild "${name}" {} ''
+              cat - > default.nix <<'EOF'
+                ${exp}
+              EOF
+              ln -s $(nix-build default.nix) > $out
+            '';
+        in recursiveDeriv // meta;
     };
   };
 }
