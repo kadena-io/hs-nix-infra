@@ -105,7 +105,7 @@
 
       # This is a utility for wrapping a Nix derivation as a new derivation in such a way
       # that the evaluation of the derivation happens inside a recursive-nix environment.
-      # It also passes the derivation's "version" and "cachedMeta" attributes through the
+      # It also passes the derivation's "version" and "cached" attributes through the
       # recursive-nix layer by materializing them at the output of a "meta" derivation.
       #
       # Note that the `exp` input is meant to be a string containing a Nix expression
@@ -117,6 +117,13 @@
       #     wrapRecursiveWithMeta "deriv-name" (wrapFlake someFlakeInMyLocalScope)
       #     wrapRecursiveWithMeta "deriv-name" "${wrapFlake someFlake}.mkDerivation someArg"
       #
+      # The `cached` attribute set is expected to have the following two optional attributes:
+      #   - meta: A Nix value that will be serialized to JSON during the recursive build and
+      #           deserialized at the output of the outer derivation. That means it can only
+      #           contain values that can go through this process. For example, it can't contain
+      #           functions or paths to the Nix store.
+      #   - paths: A set of paths that will be exposed to the outer derivation as symlinks.
+      #
       wrapRecursiveWithMeta = name: exp:
         let recursiveMeta = runRecursiveBuild "${name}-meta"
               {
@@ -124,27 +131,54 @@
               }
               ''
                 export HOME=$PWD
+                mkdir $out
                 cat - > default.nix <<'EOF'
                   let pkgs = (import ${inputs.nixpkgs-rec} {});
                       drv = ${exp};
                       version = drv.version or drv.meta.version or null;
-                      cachedMeta = drv.cachedMeta or null;
+                      cachedMeta = drv.cached.meta or null;
+                      cachedPaths = drv.cached.paths or null;
                       inherit (pkgs.lib) optionalAttrs;
-                  in builtins.toJSON (
-                      optionalAttrs (version != null) { inherit version; } //
-                      optionalAttrs (cachedMeta != null) { inherit cachedMeta; }
-                  )
+                      meta = pkgs.writeText "${name}-meta.json" (builtins.toJSON (
+                        optionalAttrs (version != null) { inherit version; } //
+                        optionalAttrs (cachedMeta != null) { meta = cachedMeta; }
+                      ));
+                      empty = pkgs.runCommand "empty" {} "mkdir $out";
+                      paths = if cachedPaths != null then
+                        pkgs.runCommand "${name}-paths" {} '''
+                            mkdir $out
+                            ''${builtins.concatStringsSep "\n"
+                                  (pkgs.lib.mapAttrsToList
+                                    (name: path: "ln -s ''${path} $out/''${name}")
+                                    cachedPaths
+                                  )
+                                }
+                          '''
+                        else empty;
+                  in {inherit meta paths;}
                 EOF
-                nix eval --raw -f default.nix > $out
+                echo $out
+                cp $(nix-build default.nix -A meta) $out/meta.json
+                ln -s $(nix-build default.nix -A paths) $out/paths
+                cp $(nix-build default.nix -A meta) $out
               '';
-            meta = builtins.fromJSON (builtins.readFile "${recursiveMeta}");
+            cachedMeta = builtins.fromJSON (builtins.readFile "${recursiveMeta}/meta.json");
+            cachedPaths = builtins.mapAttrs
+              (name: value: "${recursiveMeta}/paths/${name}")
+              (builtins.readDir "${recursiveMeta}/paths");
             recursiveDeriv = runRecursiveBuild "${name}" {} ''
               cat - > default.nix <<'EOF'
                 ${exp}
               EOF
               ln -s $(nix-build default.nix) > $out
             '';
-        in recursiveDeriv // meta;
+        in recursiveDeriv // {
+             version = cachedMeta.version or null;
+             cached = {
+               meta = cachedMeta.meta or null;
+               paths = cachedPaths;
+             };
+           };
     };
   };
 }
