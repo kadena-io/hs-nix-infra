@@ -137,36 +137,33 @@
                       drv = ${exp};
                       version = drv.version or drv.meta.version or null;
                       cachedMeta = drv.cached.meta or null;
-                      cachedPaths = drv.cached.paths or null;
+                      cachedPaths = drv.cached.paths or {};
                       inherit (pkgs.lib) optionalAttrs;
                       meta = pkgs.writeText "${name}-meta.json" (builtins.toJSON (
                         optionalAttrs (version != null) { inherit version; } //
                         optionalAttrs (cachedMeta != null) { meta = cachedMeta; }
                       ));
-                      empty = pkgs.runCommand "empty" {} "mkdir $out";
-                      paths = if cachedPaths != null then
-                        pkgs.runCommand "${name}-paths" {} '''
-                            mkdir $out
-                            ''${builtins.concatStringsSep "\n"
-                                  (pkgs.lib.mapAttrsToList
-                                    (name: path: "ln -s ''${path} $out/''${name}")
-                                    cachedPaths
-                                  )
-                                }
-                          '''
-                        else empty;
+                      paths = pkgs.writeText "${name}-paths.nix" '''
+                        {
+                          ''${builtins.concatStringsSep "\n"
+                                (pkgs.lib.mapAttrsToList
+                                  (name: path: "''${name} = \"''${path}\";")
+                                  cachedPaths
+                                )
+                              }
+                        }
+                      ''';
                   in {inherit meta paths;}
                 EOF
                 echo $out
                 cp $(nix-build default.nix -A meta) $out/meta.json
 
-                mkdir $out/paths
-                cp -P $(nix-build default.nix -A paths)/* $out/paths
+                cp $(nix-build default.nix -A paths) $out/paths.nix
               '';
             cachedMeta = builtins.fromJSON (builtins.readFile "${recursiveMeta}/meta.json");
-            cachedPaths = builtins.mapAttrs
-              (name: value: "${recursiveMeta}/paths/${name}")
-              (builtins.readDir "${recursiveMeta}/paths");
+            setCtx = path: path + builtins.substring 0 0 "${recursiveMeta}";
+            cachedPaths = import "${recursiveMeta}/paths.nix";
+            cachedPathsCtx = builtins.mapAttrs (name: path: setCtx path) cachedPaths;
             recursiveDeriv = runRecursiveBuild "${name}" {} ''
               cat - > default.nix <<'EOF'
                 ${exp}
@@ -177,8 +174,9 @@
              version = cachedMeta.version or null;
              cached = {
                meta = cachedMeta.meta or null;
-               paths = cachedPaths;
+               paths = cachedPathsCtx;
              };
+             metaDrv = recursiveMeta;
            };
     };
   };
