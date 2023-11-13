@@ -71,40 +71,32 @@
     # In order to make sure that the GHC derivations are consisten across projects
     inherit (inputs) nixpkgs haskellNix;
 
-    lib = rec {
+    # Utilities for building flake outputs inside recursive-nix derivations
+    lib.recursive = system: let pkgs = inputs.nixpkgs-rec.legacyPackages.${system}; in rec {
+      # runRecursiveBuild is a variant of pkgs.runCommand that sets up a recursive-nix
+      # environment. It sets up an env that declares the recursive-nix feature and also
+      # provides the nix CLI and a NIX_PATH. The advantage of using this utility is that
+      # it allows us to reuse the `nixpkgs` revision across all recursive-nix builds. This
+      # is important because the nixpkgs revision is a Nix-eval time dependency of the
+      # recursive derivation.
+      runRecursiveBuild = name: env: cmd: pkgs.runCommand name
+        (env // {
+          requiredSystemFeatures = [ "recursive-nix" ] ++ env.requiredSystemFeatures or [];
+          NIX_PATH = "nixpkgs=${inputs.nixpkgs-rec}";
+          buildInputs = [ pkgs.nix ] ++ env.buildInputs or [];
+        }) cmd;
 
-      # This is a utility builder for building flake outputs inside recursive-nix
-      # derivations. This is particularly useful for haskellNix projects since
-      # haskellNix projects take a long time to evaluate and they also cause
-      # multi-gigabyte downloads at Nix eval time unless the build plan is materialized.
+      # This is a utility for building a .nix file that wraps a given flake so that it can
+      # be built as a raw Nix expression inside a recursive-nix derivation. For example
       #
-      # This builder sets up an env that declares the recursive-nix feature and also
-      # provides the nix CLI and a NIX_PATH. It also provides a nix-build-flake script
-      # that can be used as follows:
-      #
-      # nix-build-flake <flake-path> <flake-output-attr> [other nix-build args...]
-      #
-      # nix-build-flake uses a flake-compat to build the provided flake in a way
-      # that will work inside a recursive-nix derivation.
-      runRecursiveBuild = system: name: env: cmd: let
-        pkgs = inputs.nixpkgs-rec.legacyPackages.${system};
-        buildInRec-nix = pkgs.writeText "buildInRec.nix" ''
-          {flake}: let
-            src = "''${flake}";
-            fetchTarball = (import ${inputs.nixpkgs-rec} {}).fetchzip;
-            defaultNix = (import ${inputs.flake-compat} { inherit src fetchTarball; }).defaultNix;
-            in defaultNix
-        '';
-        buildInRec = pkgs.writeShellScriptBin "nix-build-flake" ''
-          nix-build ${buildInRec-nix} --arg flake "$1" -A "$2" "''${@:3}"
-        '';
-        in
-          pkgs.runCommand name
-            (env // {
-              requiredSystemFeatures = [ "recursive-nix" ] ++ env.requiredSystemFeatures or [];
-              NIX_PATH = "nixpkgs=${inputs.nixpkgs-rec}";
-              buildInputs = [ buildInRec pkgs.nix ] ++ env.buildInputs or [];
-            }) cmd;
+      #  ln -s $(nix-build ${wrapFlake self} -A default) $out
+      wrapFlake = flake: pkgs.writeText "wrapped-flake.nix" ''
+        let
+          src = "${flake}";
+          fetchTarball = (import ${inputs.nixpkgs-rec} {}).fetchzip;
+          defaultNix = (import ${inputs.flake-compat} { inherit src fetchTarball; }).defaultNix;
+        in defaultNix
+      '';
     };
   };
 }
