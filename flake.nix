@@ -159,8 +159,9 @@
                 EOF
                 echo $out
                 cp $(nix-build default.nix -A meta) $out/meta.json
-                ln -s $(nix-build default.nix -A paths) $out/paths
-                cp $(nix-build default.nix -A meta) $out
+
+                mkdir $out/paths
+                cp -P $(nix-build default.nix -A paths)/* $out/paths
               '';
             cachedMeta = builtins.fromJSON (builtins.readFile "${recursiveMeta}/meta.json");
             cachedPaths = builtins.mapAttrs
