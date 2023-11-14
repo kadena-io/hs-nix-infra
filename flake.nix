@@ -72,25 +72,28 @@
     inherit (inputs) nixpkgs haskellNix;
 
     # Utilities for building flake outputs inside recursive-nix derivations
-    lib.recursive = system: let pkgs = inputs.nixpkgs-rec.legacyPackages.${system}; in rec {
+    lib.recursive = system: rec {
+
+      pkgs-rec = inputs.nixpkgs-rec.legacyPackages.${system};
+
       # runRecursiveBuild is a variant of pkgs.runCommand that sets up a recursive-nix
       # environment. It sets up an env that declares the recursive-nix feature and also
       # provides the nix CLI and a NIX_PATH. The advantage of using this utility is that
       # it allows us to reuse the `nixpkgs` revision across all recursive-nix builds. This
       # is important because the nixpkgs revision is a Nix-eval time dependency of the
       # recursive derivation.
-      runRecursiveBuild = name: env: cmd: pkgs.runCommand name
+      runRecursiveBuild = name: env: cmd: pkgs-rec.runCommand name
         (env // {
           requiredSystemFeatures = [ "recursive-nix" ] ++ env.requiredSystemFeatures or [];
           NIX_PATH = "nixpkgs=${inputs.nixpkgs-rec}";
-          buildInputs = [ pkgs.nix ] ++ env.buildInputs or [];
+          buildInputs = [ pkgs-rec.nix ] ++ env.buildInputs or [];
         }) cmd;
 
       # This is a utility for building a .nix file that wraps a given flake so that it can
       # be built as a raw Nix expression inside a recursive-nix derivation. For example
       #
       #  ln -s $(nix-build ${wrapFlake self} -A default) $out
-      wrapFlakeNix = flake: pkgs.writeText "wrapped-flake.nix" (wrapFlake flake);
+      wrapFlakeNix = flake: pkgs-rec.writeText "wrapped-flake.nix" (wrapFlake flake);
 
       # This is a utility for wrapping a flake into a Nix expression that can
       # be built inside a recursive-nix derivation. This utility is meant to be used
