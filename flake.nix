@@ -125,48 +125,27 @@
       #           deserialized at the output of the outer derivation. That means it can only
       #           contain values that can go through this process. For example, it can't contain
       #           functions or paths to the Nix store.
-      #   - paths: A set of paths that will be exposed to the outer derivation as symlinks.
       #
       wrapRecursiveWithMeta = name: exp:
-        let recursiveMeta = runRecursiveBuild "${name}-meta"
-              {
-                NIX_CONFIG = "experimental-features = nix-command flakes";
-              }
+        let recursiveMeta = runRecursiveBuild "${name}-meta" {}
               ''
-                export HOME=$PWD
                 mkdir $out
                 cat - > default.nix <<'EOF'
                   let pkgs = (import ${inputs.nixpkgs-rec} {});
                       drv = ${exp};
                       version = drv.version or drv.meta.version or null;
                       cachedMeta = drv.cached.meta or null;
-                      cachedPaths = drv.cached.paths or {};
                       inherit (pkgs.lib) optionalAttrs;
                       meta = pkgs.writeText "${name}-meta.json" (builtins.toJSON (
                         optionalAttrs (version != null) { inherit version; } //
                         optionalAttrs (cachedMeta != null) { meta = cachedMeta; }
                       ));
-                      paths = pkgs.writeText "${name}-paths.nix" '''
-                        {
-                          ''${builtins.concatStringsSep "\n"
-                                (pkgs.lib.mapAttrsToList
-                                  (name: path: "''${name} = \"''${path}\";")
-                                  cachedPaths
-                                )
-                              }
-                        }
-                      ''';
-                  in {inherit meta paths;}
+                  in {inherit meta;}
                 EOF
                 echo $out
                 cp $(nix-build default.nix -A meta) $out/meta.json
-
-                cp $(nix-build default.nix -A paths) $out/paths.nix
               '';
             cachedMeta = builtins.fromJSON (builtins.readFile "${recursiveMeta}/meta.json");
-            setCtx = path: path + builtins.substring 0 0 "${recursiveMeta}";
-            cachedPaths = import "${recursiveMeta}/paths.nix";
-            cachedPathsCtx = builtins.mapAttrs (name: path: setCtx path) cachedPaths;
             recursiveDeriv = runRecursiveBuild "${name}" {} ''
               cat - > default.nix <<'EOF'
                 ${exp}
@@ -177,7 +156,6 @@
              version = cachedMeta.version or null;
              cached = {
                meta = cachedMeta.meta or null;
-               paths = cachedPathsCtx;
              };
              metaDrv = recursiveMeta;
            };
