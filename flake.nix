@@ -74,6 +74,10 @@
     # Utilities for building flake outputs inside recursive-nix derivations
     lib.recursive = system: rec {
 
+      # We're exposing the pkgs we use for constructing the recursive derivations so
+      # that the downstream flakes can reuse it. This is important, because any nixpkgs
+      # version that gets referenced in the outer layer will have to be fetched by
+      # clients even if the results are in the cache.
       pkgs-rec = inputs.nixpkgs-rec.legacyPackages.${system};
 
       # runRecursiveBuild is a variant of pkgs.runCommand that sets up a recursive-nix
