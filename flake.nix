@@ -165,9 +165,10 @@
 
              # Meant to be used by CI jobs for triggering the build (and cache) of
              # all recursive-nix derivations.
-             showDerivations = ''
-               ${name} = ${recursiveDeriv}
-               ${name}-meta = ${recursiveMeta}
+             allDerivations = pkgs-rec.runCommand "${name}-all-derivations" {} ''
+               echo ${recursiveDeriv}
+               echo ${recursiveMeta}
+               echo OK > $out
              '';
            };
     };
