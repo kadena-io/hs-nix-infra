@@ -154,7 +154,7 @@
               cat - > default.nix <<'EOF'
                 ${exp}
               EOF
-              ln -s $(nix-build default.nix) > $out
+              ln -s $(nix-build default.nix) $out
             '';
         in recursiveDeriv // {
              version = cachedMeta.version or null;
