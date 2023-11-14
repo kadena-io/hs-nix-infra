@@ -71,40 +71,106 @@
     # In order to make sure that the GHC derivations are consisten across projects
     inherit (inputs) nixpkgs haskellNix;
 
-    lib = rec {
+    # Utilities for building flake outputs inside recursive-nix derivations
+    lib.recursive = system: rec {
 
-      # This is a utility builder for building flake outputs inside recursive-nix
-      # derivations. This is particularly useful for haskellNix projects since
-      # haskellNix projects take a long time to evaluate and they also cause
-      # multi-gigabyte downloads at Nix eval time unless the build plan is materialized.
+      # We're exposing the pkgs we use for constructing the recursive derivations so
+      # that the downstream flakes can reuse it. This is important, because any nixpkgs
+      # version that gets referenced in the outer layer will have to be fetched by
+      # clients even if the results are in the cache.
+      pkgs-rec = inputs.nixpkgs-rec.legacyPackages.${system};
+
+      # runRecursiveBuild is a variant of pkgs.runCommand that sets up a recursive-nix
+      # environment. It sets up an env that declares the recursive-nix feature and also
+      # provides the nix CLI and a NIX_PATH. The advantage of using this utility is that
+      # it allows us to reuse the `nixpkgs` revision across all recursive-nix builds. This
+      # is important because the nixpkgs revision is a Nix-eval time dependency of the
+      # recursive derivation.
+      runRecursiveBuild = name: env: cmd: pkgs-rec.runCommand name
+        (env // {
+          requiredSystemFeatures = [ "recursive-nix" ] ++ env.requiredSystemFeatures or [];
+          NIX_PATH = "nixpkgs=${inputs.nixpkgs-rec}";
+          buildInputs = [ pkgs-rec.nix ] ++ env.buildInputs or [];
+        }) cmd;
+
+      # This is a utility for building a .nix file that wraps a given flake so that it can
+      # be built as a raw Nix expression inside a recursive-nix derivation. For example
       #
-      # This builder sets up an env that declares the recursive-nix feature and also
-      # provides the nix CLI and a NIX_PATH. It also provides a nix-build-flake script
-      # that can be used as follows:
+      #  ln -s $(nix-build ${wrapFlake self} -A default) $out
+      wrapFlakeNix = flake: pkgs-rec.writeText "wrapped-flake.nix" (wrapFlake flake);
+
+      # This is a utility for wrapping a flake into a Nix expression that can
+      # be built inside a recursive-nix derivation. This utility is meant to be used
+      # by wrapRecursiveWithMeta
+      wrapFlake = flake: ''
+        (let
+          src = "${flake}";
+          fetchTarball = (import ${inputs.nixpkgs-rec} {}).fetchzip;
+          defaultNix = (import ${inputs.flake-compat} { inherit src fetchTarball; }).defaultNix;
+        in defaultNix)
+      '';
+
+      # This is a utility for wrapping a Nix derivation as a new derivation in such a way
+      # that the evaluation of the derivation happens inside a recursive-nix environment.
+      # It also passes the derivation's "version" and "cached" attributes through the
+      # recursive-nix layer by materializing them at the output of a "meta" derivation.
       #
-      # nix-build-flake <flake-path> <flake-output-attr> [other nix-build args...]
+      # Note that the `exp` input is meant to be a string containing a Nix expression
+      # that evaluates to a derivation *within a recursive-nix context*. That means either
+      # the build is unsandboxed OR care is taken to make sure that the expression doesn't
+      # try to access the local filesystem or the internet and all of its dependencies are
+      # exposed to it in the nix store. Here are examples using the `wrapFlake` utility:
       #
-      # nix-build-flake uses a flake-compat to build the provided flake in a way
-      # that will work inside a recursive-nix derivation.
-      runRecursiveBuild = system: name: env: cmd: let
-        pkgs = inputs.nixpkgs-rec.legacyPackages.${system};
-        buildInRec-nix = pkgs.writeText "buildInRec.nix" ''
-          {flake}: let
-            src = "''${flake}";
-            fetchTarball = (import ${inputs.nixpkgs-rec} {}).fetchzip;
-            defaultNix = (import ${inputs.flake-compat} { inherit src fetchTarball; }).defaultNix;
-            in defaultNix
-        '';
-        buildInRec = pkgs.writeShellScriptBin "nix-build-flake" ''
-          nix-build ${buildInRec-nix} --arg flake "$1" -A "$2" "''${@:3}"
-        '';
-        in
-          pkgs.runCommand name
-            (env // {
-              requiredSystemFeatures = [ "recursive-nix" ] ++ env.requiredSystemFeatures or [];
-              NIX_PATH = "nixpkgs=${inputs.nixpkgs-rec}";
-              buildInputs = [ buildInRec pkgs.nix ] ++ env.buildInputs or [];
-            }) cmd;
+      #     wrapRecursiveWithMeta "deriv-name" (wrapFlake someFlakeInMyLocalScope)
+      #     wrapRecursiveWithMeta "deriv-name" "${wrapFlake someFlake}.mkDerivation someArg"
+      #
+      # The `cached` attribute set is expected to have the following two optional attributes:
+      #   - meta: A Nix value that will be serialized to JSON during the recursive build and
+      #           deserialized at the output of the outer derivation. That means it can only
+      #           contain values that can go through this process. For example, it can't contain
+      #           functions or paths to the Nix store.
+      #
+      wrapRecursiveWithMeta = name: exp:
+        let recursiveMeta = runRecursiveBuild "${name}-meta" {}
+              ''
+                mkdir $out
+                cat - > default.nix <<'EOF'
+                  let pkgs = (import ${inputs.nixpkgs-rec} {});
+                      drv = ${exp};
+                      version = drv.version or drv.meta.version or null;
+                      cachedMeta = drv.cached.meta or null;
+                      inherit (pkgs.lib) optionalAttrs;
+                      meta = pkgs.writeText "${name}-meta.json" (builtins.toJSON (
+                        optionalAttrs (version != null) { inherit version; } //
+                        optionalAttrs (cachedMeta != null) { meta = cachedMeta; }
+                      ));
+                  in {inherit meta;}
+                EOF
+                echo $out
+                cp $(nix-build default.nix -A meta) $out/meta.json
+              '';
+            cachedMeta = builtins.fromJSON (builtins.readFile "${recursiveMeta}/meta.json");
+            recursiveDeriv = runRecursiveBuild "${name}" {} ''
+              cat - > default.nix <<'EOF'
+                ${exp}
+              EOF
+              ln -s $(nix-build default.nix) > $out
+            '';
+        in recursiveDeriv // {
+             version = cachedMeta.version or null;
+             cached = {
+               meta = cachedMeta.meta or null;
+             };
+             metaDrv = recursiveMeta;
+
+             # Meant to be used by CI jobs for triggering the build (and cache) of
+             # all recursive-nix derivations.
+             allDerivations = pkgs-rec.runCommand "${name}-all-derivations" {} ''
+               echo ${recursiveDeriv}
+               echo ${recursiveMeta}
+               echo OK > $out
+             '';
+           };
     };
   };
 }
