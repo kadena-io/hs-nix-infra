@@ -166,16 +166,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1707785367,
-        "narHash": "sha256-VktXMQCZww+rD4lpJz/8sieynjrdADAbpNEyTEGSnbg=",
+        "lastModified": 1707868680,
+        "narHash": "sha256-LvSBLnqPRPr50qFHp8D//jcv509CMKrsh/d2drF7HV4=",
         "owner": "input-output-hk",
         "repo": "haskell.nix",
-        "rev": "42990599ce04d78904cc01fc91b4f0b834644dad",
+        "rev": "042613a44e0f1d838e206f924213e237a2d06677",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "haskell.nix",
+        "rev": "042613a44e0f1d838e206f924213e237a2d06677",
         "type": "github"
       }
     },

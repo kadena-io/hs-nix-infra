@@ -9,7 +9,7 @@
       flake = false;
     };
     haskellNix = {
-      url = "github:input-output-hk/haskell.nix";
+      url = "github:input-output-hk/haskell.nix/042613a44e0f1d838e206f924213e237a2d06677";
 
       # This allows downstream flakes to override hackage through this flake
       inputs.hackage.follows = "hackage";
