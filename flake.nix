@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs?rev=4d2b37a84fad1091b9de401eb450aae66f1a741e";
+    nixpkgs.url = "github:NixOS/nixpkgs";
 
     # We're declaring hackage as a direct input to this flake so that downstream
     # flakes can override it.
