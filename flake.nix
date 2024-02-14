@@ -34,6 +34,9 @@
         "hls-1.10".follows = "empty";
         "hls-2.0".follows = "empty";
         "hls-2.2".follows = "empty";
+        "hls-2.3".follows = "empty";
+        "hls-2.4".follows = "empty";
+        "hls-2.5".follows = "empty";
         hpc-coveralls.follows = "empty";
         nixpkgs-2003.follows = "empty";
         nixpkgs-2105.follows = "empty";
@@ -41,10 +44,12 @@
         nixpkgs-2205.follows = "empty";
         nixpkgs-2211.follows = "empty";
         nixpkgs-2305.follows = "empty";
+        nixpkgs-2311.follows = "empty";
         old-ghc-nix.follows = "empty";
         iserv-proxy.follows = "empty";
         hydra.follows = "empty";
         ghc980.follows = "empty";
+        ghc98X.follows = "empty";
         ghc99.follows = "empty";
       };
     };
