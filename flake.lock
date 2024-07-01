@@ -51,11 +51,11 @@
     "hackage": {
       "flake": false,
       "locked": {
-        "lastModified": 1716251552,
-        "narHash": "sha256-BcEi0N7vtvNDGNTvWkys2OMBn7kponqXzbvRQmpHlaU=",
+        "lastModified": 1719794527,
+        "narHash": "sha256-qHo/KumtwAzPkfLWODu/6EFY/LeK+C7iPJyAUdT8tGA=",
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "5891424a8a982f5c42b9cea6fed7221f2426a322",
+        "rev": "da2a3bc9bd1b3dd41bb147279529c471c615fd3e",
         "type": "github"
       },
       "original": {
@@ -83,12 +83,6 @@
         ],
         "flake-compat": "flake-compat_2",
         "ghc-8.6.5-iohk": [
-          "empty"
-        ],
-        "ghc910X": [
-          "empty"
-        ],
-        "ghc911": [
           "empty"
         ],
         "hackage": [
@@ -158,11 +152,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1716252607,
-        "narHash": "sha256-QsljiA7KBPFviyUJRil++p/JxLvp7tF9+L0mBtS5fnU=",
+        "lastModified": 1719795037,
+        "narHash": "sha256-5xLJg7jOWqXuoYSDbNbF3dw1Rhs0D0SLFl9iTR+cp64=",
         "owner": "input-output-hk",
         "repo": "haskell.nix",
-        "rev": "88f20f0876efc11eff32fffc1b9721e6bee3868f",
+        "rev": "3234e94cd4eca7d2992a3938fb6200dfb8b86a84",
         "type": "github"
       },
       "original": {
